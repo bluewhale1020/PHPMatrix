@@ -1,41 +1,18 @@
-# INTRODUCTION
-This is a PHP extension which computes float matrix products.
+# はじめに
+PHPで行う行列計算を速くする為のPHP Extensionです。元のソースは、[dnishiyama85](https://github.com/dnishiyama85)/**PHPMatrix** です。Windows10上でコンパイルする際に、pthreadのコンパイルエラーが避けられなかったので、削除しました。また、OpenBLASも利用しません。
 
-- It supports OpenBLAS sgemm and cuBLAS sgemm function.
-- To Enable OpenBLAS support, you have to specify its library path.
-- To Enable cuBLAS support, CUDA development environment required.
-- Some other functions like sum, scale, transpose, etc... included.
-(But, they are not utilize OpenBLAS nor cuBLAS.)
-- PHP7 required.
 
-# INSTALL
+# コンパイルとインストール
 
-Clone this repository to your computer.
+Windows上でPHPのextension作成については、かなり長くなり、注意点もいくつかありますので、**extensionビルド方法.txt**ファイルを参照ください。
 
-PHP development environment required.
+# サンプルコードの実行
+
+testsフォルダにある**test_methods.php**で、いくつかのメソッドを実行できます。
 
 ```shell
-$ cd PHPMatrix
-$ phpize
-
-# for simple matrix multiplication
-$ ./configure
-
-# to enable OpenBLAS support
-$ ./configure --with-openblas=/PATH/TO/OpenBLAS # ex.) /opt/OpenBLAS
-
-# to enable cuBLAS support
-$ ./configure --enable-cublas
-$ ./build_cublas_support_lib.sh # to build CUDA code.
-
-$ make
-$ make install # if needed
-```
-
-# Running sample code
-```shell
-# specify the extension file explicitly unless installed globally.
-$ php -d extension=./modules/matrix.so sample.php
+# インストールしたPHPフォルダに移動
+$ php.exe -d extension=c:\php\ext\php_matrix.dll test_methods.php
 ```
 # LICENSE
 This software is released under the MIT License, see LICENSE.

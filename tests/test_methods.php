@@ -1,32 +1,50 @@
 <?php
 ini_set('memory_limit', '256M');
 
-    $a = [[1,2,3], [4,5,6]];
+$a = [[1,2,3], [4,5,6]];
+$b = [[7,8,9], [10,11,12]];
+$c = [[13,14], [15,16], [17,18]];
+$vector = [3,9,2];
+
     $matA = Matrix::createFromData($a);
-    $b = [[7,8,9], [10,11,12]];
+
     $matB = Matrix::createFromData($b);
-    $c = [[13,14], [15,16], [17,18]];
+
     $matC = Matrix::createFromData($c);
 
-    $matProduct = $matA->mul($matB);
+    //$expected = [[94,100],[229,244]];
+    $matD = $matA->mul($matC);
+    print("積：");        
+    print_r($matD->toArray()) ;
+
+    $expected = [[7,16,27],[40,55,72]];
     $matElemProduct = $matA->componentwiseProd($matB);
+    print("要素同士の積：");    
+    print_r($expected);
+    print_r($matElemProduct->toArray());
+
+    $expected = [[8,10,12],[14,16,18]];
     $matSum = $matA->plus($matB);
+    print("和：");    
+    print_r($expected);    
+    print_r($matSum->toArray());
+
+    $expected = [[-6,-6,-6],[-6,-6,-6]];
     $matDiff = $matA->minus($matB);
-    $matScalar = $matA->scale(2);      
-    
-    $matTrans = $matB->transpose();
+    print("差：");    
+    print_r($expected);    
+    print_r($matDiff->toArray());
 
+    $expected = [[2,4,6],[8,10,12]];
+    $matScalar = $matA->scale(doubleval(2));
+    print("スカラー倍：");    
+    print_r($expected);    
+    print_r($matScalar->toArray());    
 
-    echo "sum:";
-    print_r($matSum);
-    echo "diff:";
-    print_r($matDiff);
-    echo "element product:";
-    print_r($matElemProduct);    
-    echo "product:";
-    print_r($matProduct->toArray());
-    echo "scalar:";
-    print_r($matScalar);
-    echo "trans:";
-    print_r($matTrans);
+    $expected = [[1,4],[2,5],[3,6]];
+    $matTrans = $matA->transpose();
+    print("転置：");
+    print_r($expected);    
+    print_r($matTrans->toArray());
+
 
