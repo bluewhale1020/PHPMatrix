@@ -26,12 +26,6 @@
 #include "php_ini.h"
 #include "ext/standard/info.h"
 #include "php_matrix.h"
-#include "pthread.h"
-
-#ifdef USE_OPENBLAS
-#include "cblas.h"
-#endif
-
 
 /* If you declare any globals in php_matrix.h uncomment this:
 ZEND_DECLARE_MODULE_GLOBALS(matrix)
@@ -78,25 +72,11 @@ PHP_FUNCTION(confirm_matrix_compiled)
    follow this convention for the convenience of others editing your code.
 */
 
-
-/* {{{ php_matrix_init_globals
- */
-/* Uncomment this function if you have INI entries
-static void php_matrix_init_globals(zend_matrix_globals *matrix_globals)
-{
-	matrix_globals->global_value = 0;
-	matrix_globals->global_string = NULL;
-}
-*/
-/* }}} */
-
 static inline php_matrix* php_matrix_fetch_object(zend_object* obj) {
     return (php_matrix*)((char *)obj - XtOffsetOf(php_matrix, std));
 }
 
 #define Z_MATRIX_OBJ_P(zv) php_matrix_fetch_object(Z_OBJ_P(zv));
-
-zend_class_entry* matrix_ce;
 
 static zend_object_handlers matrix_object_handlers;
 
@@ -114,6 +94,7 @@ static php_matrix* init_return_value(zval* return_value, long numRows, long numC
     result->data = ecalloc(result->numRows * result->numCols, sizeof(float));
     return result;
 }
+
 
 // デストラクタ
 static void php_matrix_destroy_object(zend_object* object) {
@@ -186,11 +167,11 @@ PHP_METHOD(Matrix, set) {
     object->data[i * object->numCols + j] = val;
 }
 
-// 外部ライブラリ(OpenBLAS, CuBLAS）を使わないシンプルな行列積の実装
+// 行列積の実装
 // (r1, c1): (a の行数, a の列数)
 // (r2, c2): (b の行数, b の列数)
 
-static inline void _simple_mul(float* a, float* b, float* c, int r1, int c1, int r2, int c2) {
+static inline void _mul(float* a, float* b, float* c, int r1, int c1, int r2, int c2) {
 
     for (int i = 0; i < r1; ++i) {
         for (int j = 0; j < c2; ++j) {
@@ -200,23 +181,6 @@ static inline void _simple_mul(float* a, float* b, float* c, int r1, int c1, int
         }
     }
 }
-
-#ifdef USE_OPENBLAS
-// OpenBLAS を使った行列積
-static inline void _openblas_mul(float* a, float* b, float* c, int r1, int c1, int r2, int c2) {
-    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-            r1, c2, c1,
-            1.0,
-            a, c1,
-            b, c2,
-            0.0,
-            c, c2);
-}
-#endif
-
-#ifdef USE_CUBLAS
-extern void _cublas_mul(float* a, float* b, float* c, int r1, int c1, int r2, int c2);
-#endif
 
 // 行列の積
 PHP_METHOD(Matrix, mul) {
@@ -241,13 +205,9 @@ PHP_METHOD(Matrix, mul) {
     // 結果の matrix を作成
     php_matrix* result = init_return_value(return_value, r1, c2);
 
-#if defined USE_OPENBLAS
-    _openblas_mul(self->data, matrix->data, result->data, r1, c1, r2, c2);
-#elif defined USE_CUBLAS
-    _cublas_mul(self->data, matrix->data, result->data, r1, c1, r2, c2);
-#else
-    _simple_mul(self->data, matrix->data, result->data, r1, c1, r2, c2);
-#endif
+
+    _mul(self->data, matrix->data, result->data, r1, c1, r2, c2);
+
 
 }
 
@@ -344,14 +304,46 @@ PHP_METHOD(Matrix, minus) {
     }
 }
 
+//  PHP_METHOD(Matrix, hello){
+//    zval *data, *obj;
+//    obj = getThis();
+
+//    data = zend_read_property(matrix_ce, obj, "yourname", sizeof("yourname") - 1, 1,NULL);
+
+//    printf("hello, %s\n", data->value.str->val);
+//    RETURN_TRUE;
+//  }
+
+// PHP_FUNCTION(my_sum)
+// {
+//     /* 引数の格納先 */
+//     zend_long a, b;
+
+//     /* 引数をパースして a, b に代入 */
+//     ZEND_PARSE_PARAMETERS_START(2, 2)
+//         Z_PARAM_LONG(a)
+//         Z_PARAM_LONG(b)
+//     ZEND_PARSE_PARAMETERS_END();
+
+//     /* 和を計算 */
+//     zend_long c = a + b;
+
+//     /* 結果を return する */
+//     RETURN_LONG(c);
+// }
+
 // スカラー倍
 PHP_METHOD(Matrix, scale) {
     php_matrix* self = Z_MATRIX_OBJ_P(getThis());
 
-    float scalar;
-    if (zend_parse_parameters(ZEND_NUM_ARGS(), "d", &scalar) == FAILURE) {
-        return;
-    }
+    double scalar;
+    // if (zend_parse_parameters(ZEND_NUM_ARGS(), "d", &scalar) == FAILURE) {
+    //     return;
+    // }
+    // 引数をパースして格納先に代入
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_DOUBLE(scalar)
+    ZEND_PARSE_PARAMETERS_END();
 
     if (!self) {
         RETURN_FALSE;
@@ -368,6 +360,7 @@ PHP_METHOD(Matrix, scale) {
             result->data[i * c + j] = self->data[i * c + j] * scalar;
         }
     }
+
 }
 
 // 転置
@@ -387,83 +380,6 @@ PHP_METHOD(Matrix, transpose) {
     }
 }
 
-// 行方向に和を取る
-PHP_METHOD(Matrix, sumRow) {
-    php_matrix* self = Z_MATRIX_OBJ_P(getThis());
-
-    long r = self->numRows;
-    long c = self->numCols;
-
-    // 結果の matrix を作成
-    php_matrix* result = init_return_value(return_value, 1, c);
-
-    for (long j = 0; j < c; ++j) {
-        float sum = 0;
-        for (long i = 0; i < r; ++i) {
-            sum += self->data[i * c + j];
-        }
-        result->data[j] = sum;
-    }
-}
-
-// 列方向に和を取る
-PHP_METHOD(Matrix, sumCol) {
-    php_matrix* self = Z_MATRIX_OBJ_P(getThis());
-
-    long r = self->numRows;
-    long c = self->numCols;
-
-    // 結果の matrix を作成
-    php_matrix* result = init_return_value(return_value, r, 1);
-
-    for (long i = 0; i < r; ++i) {
-        float sum = 0;
-        for (long j = 0; j < c; ++j) {
-            sum += self->data[i * c + j];
-        }
-        result->data[i] = sum;
-    }
-}
-
-PHP_METHOD(Matrix, argmax) {
-    php_matrix* self = Z_MATRIX_OBJ_P(getThis());
-
-    long dir;
-    if (zend_parse_parameters(ZEND_NUM_ARGS(), "l", &dir) == FAILURE) {
-        return;
-    }
-
-    long r = self->numRows;
-    long c = self->numCols;
-
-    if (dir == 0) {
-        php_matrix* result = init_return_value(return_value, 1, c);
-        for (long j = 0; j < c; ++j) {
-            float max = FLT_MIN;
-            long index = 0;
-            for (long i = 0; i < r; ++i) {
-                if (self->data[i * c + j] > max) {
-                    index = i;
-                    max = self->data[i * c + j];
-                }
-            }
-            result->data[j] = index;
-        }
-    } else {
-        php_matrix* result = init_return_value(return_value, r, 1);
-        for (long i = 0; i < r; ++i) {
-            float max = FLT_MIN;
-            long index = 0;
-            for (long j = 0; j < c; ++j) {
-                if (self->data[i * c + j] > max) {
-                    index = j;
-                    max = self->data[i * c + j];
-                }
-            }
-            result->data[i] = index;
-        }
-    }
-}
 
 PHP_METHOD(Matrix, toArray) {
     php_matrix* self = Z_MATRIX_OBJ_P(getThis());
@@ -495,12 +411,12 @@ PHP_METHOD(Matrix, createFromData) {
     }
     HashTable* rows = HASH_OF(z_data);
 
-    uint numRows = zend_hash_num_elements(rows);
+    int numRows = zend_hash_num_elements(rows);//uint or int?
 
     zval* row = zend_hash_index_find(rows, 0);
     HashTable* first_row = HASH_OF(row);
 
-    uint numCols = zend_hash_num_elements(first_row);
+    int numCols = zend_hash_num_elements(first_row);
 
     // 結果の matrix を作成
     php_matrix* result = init_return_value(return_value, numRows, numCols);
@@ -559,9 +475,14 @@ PHP_METHOD(Matrix, onesLike) {
     }
 }
 
+
+
+
+
 const zend_function_entry matrix_methods[] = {
-    PHP_ME(Matrix, __construct, NULL, ZEND_ACC_CTOR | ZEND_ACC_PUBLIC)
-    PHP_ME(Matrix, shape, NULL, ZEND_ACC_PUBLIC)
+	// PHP_ME(Matrix,hello,NULL,ZEND_ACC_PUBLIC)
+    PHP_ME(Matrix, __construct, NULL, ZEND_ACC_CTOR | ZEND_ACC_PUBLIC)	
+    PHP_ME(Matrix, shape, NULL, ZEND_ACC_PUBLIC)		
     PHP_ME(Matrix, get, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, set, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, mul, NULL, ZEND_ACC_PUBLIC)
@@ -570,34 +491,43 @@ const zend_function_entry matrix_methods[] = {
     PHP_ME(Matrix, minus, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, scale, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, transpose, NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Matrix, sumRow, NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Matrix, sumCol, NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Matrix, argmax, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, toArray, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, createFromData, NULL, ZEND_ACC_STATIC | ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, zerosLike, NULL, ZEND_ACC_STATIC | ZEND_ACC_PUBLIC)
-    PHP_ME(Matrix, onesLike, NULL, ZEND_ACC_STATIC | ZEND_ACC_PUBLIC)
-    {NULL, NULL, NULL}
+    PHP_ME(Matrix, onesLike, NULL, ZEND_ACC_STATIC | ZEND_ACC_PUBLIC)    
+    PHP_FE_END  /* Must be the last line in myext_functions[] */
 };
+
+/* {{{ php_matrix_init_globals
+ */
+/* Uncomment this function if you have INI entries
+static void php_matrix_init_globals(zend_matrix_globals *matrix_globals)
+{
+	matrix_globals->global_value = 0;
+	matrix_globals->global_string = NULL;
+}
+*/
+/* }}} */
 
 /* {{{ PHP_MINIT_FUNCTION
  */
 PHP_MINIT_FUNCTION(matrix)
 {
-	/* If you have INI entries, uncomment these lines
-	REGISTER_INI_ENTRIES();
-	*/
-    zend_class_entry ce;
-    INIT_CLASS_ENTRY(ce, "Matrix", matrix_methods);
-    matrix_ce = zend_register_internal_class(&ce);
+	zend_class_entry ce;
+	INIT_CLASS_ENTRY(ce, "Matrix", matrix_methods);
+	matrix_ce = zend_register_internal_class(&ce TSRMLS_CC);	
     matrix_ce->create_object = php_matrix_new;
-
+		
     memcpy(&matrix_object_handlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
     matrix_object_handlers.offset    = XtOffsetOf(php_matrix, std);
     matrix_object_handlers.clone_obj = NULL;
     matrix_object_handlers.free_obj  = php_matrix_object_free_storage;
-    matrix_object_handlers.dtor_obj  = php_matrix_destroy_object;
-
+    matrix_object_handlers.dtor_obj  = php_matrix_destroy_object;		
+	// zend_declare_property_string(matrix_ce,"yourname", strlen("yourname"),"noname", ZEND_ACC_PUBLIC);	
+	
+	/* If you have INI entries, uncomment these lines
+	REGISTER_INI_ENTRIES();
+	*/
 	return SUCCESS;
 }
 /* }}} */
@@ -657,6 +587,8 @@ const zend_function_entry matrix_functions[] = {
 	PHP_FE_END	/* Must be the last line in matrix_functions[] */
 };
 /* }}} */
+
+
 
 /* {{{ matrix_module_entry
  */

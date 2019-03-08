@@ -2,7 +2,7 @@
 $br = (php_sapi_name() == "cli")? "":"<br>";
 
 if(!extension_loaded('matrix')) {
-	dl('matrix.' . PHP_SHLIB_SUFFIX);
+	dl('php_matrix.' . PHP_SHLIB_SUFFIX);
 }
 $module = 'matrix';
 $functions = get_extension_funcs($module);

@@ -1,0 +1,125 @@
+参考URL
+https://wiki.php.net/internals/windows/stepbystepbuild_sdk_2
+http://blog.yuyat.jp/archives/1028
+https://qiita.com/d_nishiyama85/items/98f901dcc848a79c81fb
+
+必要な物
+・PHPソース
+・php-sdk（php-sdk-binary-tools-YYYYMMDD.zip, get the latest one）
+・Visual C++ 15.0 (Visual Studio 2017) for PHP 7.2+
+
+0.準備
+Install Visual Studio 2017
+
+Setup the build directory
+--------------------------
+//“VS2017 x86 Native Tools Command Prompt”を開く
+
+git clone https://github.com/Microsoft/php-sdk-binary-tools.git
+cd c:\php-sdk\
+//invoke 
+phpsdk-vc15-x32.bat
+
+//Run the buildtree batch script
+phpsdk_buildtree phpmaster
+
+//Extract the PHP source code to C:\php-sdk\phpdev\vc##\x##
+//For example: C:\php-sdk\phpdev\vc11\x86\php-src
+
+//switch into the php source directory and run phpsdk_deps -u
+//This should include the libraries needed to build most the core extensions
+-------------------------
+
+本体のコンパイル
+------------------------
+注：VisualStudioの更新に、php-srcの対応がついていけない問題があり
+cf. https://github.com/Microsoft/php-sdk-binary-tools/issues/24
+phpソース中の、win32/build/confutils.jsファイルに次の2行を追加する
+(1916を最新のヴァージョンに変更すること)
++ VC_VERSIONS[1916] = 'MSVC15 (Visual C++ 2017)';
++ VC_VERSIONS_SHORT[1916] = 'VC15';
+
+//switch into the php source directory
+cd C:\php-sdk\phpdev\vc15\x86\php-src
+
+buildconf
+
+configure --help
+
+//Create your configure command
+configure --disable-all --enable-cli
+
+//To build PHP, run: 
+nmake
+
+nmake install
+//c:\php以下にphpがインストール
+//./SDKフォルダにphpizeができる。これを利用する。
+------------------------
+再コンパイルの場合は
+------------------------
+//clean up previous binary
+nmake clean
+
+buildconf --force
+
+configure --disable-all --enable-cli
+
+nmake
+------------------------
+
+
+以下、extensionの単独ビルド
+
+//“VS2017 x86 Native Tools Command Prompt”を開く
+
+cd c:\php-sdk\
+//invoke 
+phpsdk-vc15-x86.bat
+
+
+1.スケルトンの作成
+cytwinをインストール
+
+//php-src/ext/ext_skel_win32.php内をcygwinインストールフォルダを指すように編集
+$cygwin_path = 'C:\cygwin64\bin';
+
+php ext_skel_win32.php --extname=test
+//php-src/ext/test内に雛形が作成される
+
+
+
+2.config.w32の編集
+configureオプションに作成したextensionを含めるため
+
+//////////////////////
+// $Id$
+// vim:ft=javascript
+
+configureエラーを防ぐために、上下のコメント行を全て削除
+ARG_ENABLE("matrix", "enable matrix support", "no");
+
+if (PHP_MATRIX != "no") {
+	EXTENSION("matrix", "matrix.c", true); //dll出力には、引数3つ目をtrueに
+}
+
+/////////////////////
+
+3.ビルドする
+extensionフォルダに移動
+c:\php\SDK\phpize実行
+configure --helpで、--enable-extnameがあることを確認
+configure --enable-extname
+
+nmake
+
+Release_TS内に、ビルド後のdllファイルが置かれる
+
+dllファイルをPHPのextフォルダ内に設置
+
+
+4.テスト
+インストールしたPHPフォルダに移動
+./php.exe -d extension=c:\php\ext\dllname.dll test.phpを実行
+
+
