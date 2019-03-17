@@ -15,7 +15,7 @@
   | Author:                                                              |
   +----------------------------------------------------------------------+
 */
-
+#include <math.h>
 /* $Id$ */
 
 #ifdef HAVE_CONFIG_H
@@ -158,13 +158,76 @@ PHP_METHOD(Matrix, get) {
 // (i, j) 成分を設定
 PHP_METHOD(Matrix, set) {
     long i, j;
-    float val;
-    if (zend_parse_parameters(ZEND_NUM_ARGS(), "lld", &i, &j, &val) == FAILURE) {
-        return;
-    }
+    double val;
+    // if (zend_parse_parameters(ZEND_NUM_ARGS(), "lld", &i, &j, &val) == FAILURE) {
+    //     return;
+    // }
+    /* 引数をパースして a, b に代入 */
+    ZEND_PARSE_PARAMETERS_START(3, 3)
+        Z_PARAM_LONG(i)
+        Z_PARAM_LONG(j)
+        Z_PARAM_DOUBLE(val)        
+    ZEND_PARSE_PARAMETERS_END();
+
     // printf("(i, j, val) = (%ld, %ld, %f)\n", i, j, val);
     php_matrix* object = Z_MATRIX_OBJ_P(getThis());
     object->data[i * object->numCols + j] = val;
+}
+
+// expandRows($matrix,$num_row)
+PHP_METHOD(Matrix,expandRows) {
+    php_matrix* self = Z_MATRIX_OBJ_P(getThis());
+
+
+    if (!self) {
+        RETURN_FALSE;
+    }
+    long newRows;
+    /* 引数をパースして a, b に代入 */
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_LONG(newRows)
+    ZEND_PARSE_PARAMETERS_END();
+
+    // long r = self->numRows;
+    long c = self->numCols;
+
+    // 結果の matrix を作成
+    php_matrix* result = init_return_value(return_value, newRows, c);
+
+    for (long i = 0; i < newRows; ++i) {
+        for (long j = 0; j < c; ++j) {
+            result->data[i * c + j] = self->data[j];
+        }
+    }
+
+}
+
+// expandColumns($matrix,$num_column)
+PHP_METHOD(Matrix,expandColumns) {
+    php_matrix* self = Z_MATRIX_OBJ_P(getThis());
+
+
+    if (!self) {
+        RETURN_FALSE;
+    }
+    long newCols;
+    /* 引数をパースして a, b に代入 */
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_LONG(newCols)
+    ZEND_PARSE_PARAMETERS_END();
+
+    long r = self->numRows;
+    // long c = self->numCols;
+
+    // 結果の matrix を作成
+    php_matrix* result = init_return_value(return_value, r, newCols);
+
+    for (long i = 0; i < r; ++i) {
+        for (long j = 0; j < newCols; ++j) {
+            result->data[i * newCols + j] = self->data[i * newCols];
+        }
+    }
+
 }
 
 // 行列積の実装
@@ -477,6 +540,134 @@ PHP_METHOD(Matrix, onesLike) {
 
 
 
+// activatefunction relu
+PHP_METHOD(Matrix,reluFunc) {
+    php_matrix* self = Z_MATRIX_OBJ_P(getThis());
+
+
+    if (!self) {
+        RETURN_FALSE;
+    }
+
+    long r = self->numRows;
+    long c = self->numCols;
+
+    // 結果の matrix を作成
+    php_matrix* result = init_return_value(return_value, r, c);
+
+    for (long i = 0; i < r; ++i) {
+        for (long j = 0; j < c; ++j) {
+            result->data[i * c + j] = MAMIN(MAMAX(0.002*self->data[i * c + j],self->data[i * c + j]), 6);
+        }
+    }
+
+}
+
+// activatefunction relu derivative
+PHP_METHOD(Matrix,reluDer) {
+    php_matrix* self = Z_MATRIX_OBJ_P(getThis());
+
+
+    if (!self) {
+        RETURN_FALSE;
+    }
+
+    long r = self->numRows;
+    long c = self->numCols;
+
+    // 結果の matrix を作成
+    php_matrix* result = init_return_value(return_value, r, c);
+
+    for (long i = 0; i < r; ++i) {
+        for (long j = 0; j < c; ++j) {
+            result->data[i * c + j] = ((self->data[i * c + j] > 0)? 1:0.002);
+        }
+    }
+
+}
+
+// activatefunction tanh
+PHP_METHOD(Matrix,tanhFunc) {
+    php_matrix* self = Z_MATRIX_OBJ_P(getThis());
+
+
+    if (!self) {
+        RETURN_FALSE;
+    }
+
+    long r = self->numRows;
+    long c = self->numCols;
+
+    // 結果の matrix を作成
+    php_matrix* result = init_return_value(return_value, r, c);
+
+    for (long i = 0; i < r; ++i) {
+        for (long j = 0; j < c; ++j) {
+            result->data[i * c + j] = tanhf(self->data[i * c + j]);
+        }
+    }
+
+}
+
+// activatefunction tanh derivative
+PHP_METHOD(Matrix,tanhDer) {
+    php_matrix* self = Z_MATRIX_OBJ_P(getThis());
+
+
+    if (!self) {
+        RETURN_FALSE;
+    }
+
+    long r = self->numRows;
+    long c = self->numCols;
+
+    // 結果の matrix を作成
+    php_matrix* result = init_return_value(return_value, r, c);
+
+
+    for (long i = 0; i < r; ++i) {
+        for (long j = 0; j < c; ++j) {
+            result->data[i * c + j] = (1 - self->data[i * c + j]*self->data[i * c + j]);
+        }
+    }
+
+}
+
+
+// for adam, adjust learning rate
+PHP_METHOD(Matrix,adjustLr) {
+    php_matrix* self = Z_MATRIX_OBJ_P(getThis());
+
+
+    double lr;
+    double epsilon;
+
+    if (!self) {
+        RETURN_FALSE;
+    }
+
+    // 引数をパースして格納先に代入
+    ZEND_PARSE_PARAMETERS_START(2, 2)
+        Z_PARAM_DOUBLE(lr)
+        Z_PARAM_DOUBLE(epsilon)        
+    ZEND_PARSE_PARAMETERS_END();
+
+
+    long r = self->numRows;
+    long c = self->numCols;
+
+    // 結果の matrix を作成
+    php_matrix* result = init_return_value(return_value, r, c);
+
+//$this->lr/(sqrt($value) + $this->betaParams['ϵ']);
+    for (long i = 0; i < r; ++i) {
+        for (long j = 0; j < c; ++j) {
+            result->data[i * c + j] = lr /(sqrtf(self->data[i * c + j]) + epsilon);
+        }
+    }
+
+}
+
 
 
 const zend_function_entry matrix_methods[] = {
@@ -485,6 +676,8 @@ const zend_function_entry matrix_methods[] = {
     PHP_ME(Matrix, shape, NULL, ZEND_ACC_PUBLIC)		
     PHP_ME(Matrix, get, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, set, NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Matrix, expandRows, NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Matrix, expandColumns, NULL, ZEND_ACC_PUBLIC)   
     PHP_ME(Matrix, mul, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, componentwiseProd, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, plus, NULL, ZEND_ACC_PUBLIC)
@@ -492,6 +685,11 @@ const zend_function_entry matrix_methods[] = {
     PHP_ME(Matrix, scale, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, transpose, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, toArray, NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Matrix, reluFunc, NULL,  ZEND_ACC_PUBLIC)    
+    PHP_ME(Matrix, tanhFunc, NULL,  ZEND_ACC_PUBLIC)    
+    PHP_ME(Matrix, reluDer, NULL,  ZEND_ACC_PUBLIC)    
+    PHP_ME(Matrix, tanhDer, NULL,  ZEND_ACC_PUBLIC)    
+    PHP_ME(Matrix, adjustLr, NULL,  ZEND_ACC_PUBLIC)      
     PHP_ME(Matrix, createFromData, NULL, ZEND_ACC_STATIC | ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, zerosLike, NULL, ZEND_ACC_STATIC | ZEND_ACC_PUBLIC)
     PHP_ME(Matrix, onesLike, NULL, ZEND_ACC_STATIC | ZEND_ACC_PUBLIC)    

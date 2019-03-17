@@ -58,6 +58,32 @@ ZEND_END_MODULE_GLOBALS(matrix)
 ZEND_TSRMLS_CACHE_EXTERN()
 #endif
 
+/*
+        MAMAX - 最大値取得 -
+*/
+/**
+ * 指定された2つの引数のうち,最大のものを返す.
+ * @param [in] a        最大値を選ぶ対象の変数1
+ * @param [in] b        最大値を選ぶ対象の変数2
+ * @retval 最大値
+ * @attention 引数は複数回評価される.
+ */
+#define MAMAX(a, b) ((a) > (b) ? (a) : (b))
+
+
+/*
+        MAMIN - 最小値取得 -
+*/
+/**
+ * 指定された2つの引数のうち,最小のものを返す.
+ * @param [in] a        最小値を選ぶ対象の変数1
+ * @param [in] b        最小値を選ぶ対象の変数2
+ * @retval 最小値
+ * @attention 引数は複数回評価される.
+ */
+#define MAMIN(a, b) ((a) < (b) ? (a) : (b))
+
+
 //クラス宣言
 static zend_class_entry *matrix_ce;
 

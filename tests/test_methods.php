@@ -7,7 +7,7 @@ $c = [[13,14], [15,16], [17,18]];
 $vector = [3,9,2];
 
     $matA = Matrix::createFromData($a);
-
+    $matX = $matA;
     $matB = Matrix::createFromData($b);
 
     $matC = Matrix::createFromData($c);
@@ -42,9 +42,13 @@ $vector = [3,9,2];
     print_r($matScalar->toArray());    
 
     $expected = [[1,4],[2,5],[3,6]];
-    $matTrans = $matA->transpose();
+    $matA = $matA->transpose();
     print("転置：");
     print_r($expected);    
-    print_r($matTrans->toArray());
+    print_r($matA->toArray());
 
+print("clone matrix:");
 
+    // print($matA->get(0,0));
+    print_r($matA->toArray());
+    print_r($matX->toArray());    
