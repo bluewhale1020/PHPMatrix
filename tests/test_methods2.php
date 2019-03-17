@@ -7,13 +7,17 @@ $c = [[13,14], [15,16], [17,18]];
 $afm = [[1,7,-2]];
 $lrm = [[1,4,9]];
 
-$vector = [3,9,2];
+$vector = [[3,9,2]];
+$vector2 = [[3],[9],[2]];
 
     $matA = Matrix::createFromData($a);
 
     $matAFM = Matrix::createFromData($afm);
 
     $matLrm = Matrix::createFromData($lrm);
+
+    $matV = Matrix::createFromData($vector);
+    $matV2 = Matrix::createFromData($vector2);
 
     $expected = [[0,0,0], [0,0,0]];
     $matZ = Matrix::zerosLike($matA);
@@ -65,3 +69,20 @@ $vector = [3,9,2];
     print("adjustLr:");  
     print_r($expected);          
     print_r($matLr->toArray()) ;    
+
+
+    // expandRows  [3,9,2];
+    //
+    $expected = [[3,9,2],[3,9,2],[3,9,2]];
+    $matV = $matV->expandRows(3);
+    print("expandRows:");  
+    print_r($expected);          
+    print_r($matV->toArray()) ;    
+
+        // expandColumns  $vector2 = [[3],[9],[2]];
+    //
+    $expected = [[3,3,3],[9,9,9],[2,2,2]];
+    $matV2 = $matV2 ->expandColumns(3);
+    print("expandColumns:");  
+    print_r($expected);          
+    print_r($matV2->toArray()) ;

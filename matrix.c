@@ -224,7 +224,7 @@ PHP_METHOD(Matrix,expandColumns) {
 
     for (long i = 0; i < r; ++i) {
         for (long j = 0; j < newCols; ++j) {
-            result->data[i * newCols + j] = self->data[i * newCols];
+            result->data[i * newCols + j] = self->data[i];
         }
     }
 
