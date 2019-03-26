@@ -474,12 +474,12 @@ PHP_METHOD(Matrix, createFromData) {
     }
     HashTable* rows = HASH_OF(z_data);
 
-    int numRows = zend_hash_num_elements(rows);//uint or int?
+    uint numRows = zend_hash_num_elements(rows);//uint or int?
 
     zval* row = zend_hash_index_find(rows, 0);
     HashTable* first_row = HASH_OF(row);
 
-    int numCols = zend_hash_num_elements(first_row);
+    uint numCols = zend_hash_num_elements(first_row);
 
     // 結果の matrix を作成
     php_matrix* result = init_return_value(return_value, numRows, numCols);

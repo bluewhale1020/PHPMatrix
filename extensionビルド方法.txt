@@ -120,6 +120,6 @@ dllファイルをPHPのextフォルダ内に設置
 
 4.テスト
 インストールしたPHPフォルダに移動
-php.exe -d extension=c:\php\ext\dllname.dll test_methods.phpを実行
+./php.exe -d extension=c:\php\ext\dllname.dll test.phpを実行
 
 
